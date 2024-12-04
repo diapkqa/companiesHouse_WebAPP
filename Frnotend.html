@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Company Search</title>
+</head>
+<body>
+
+    <h1>Search Companies</h1>
+
+    <label for="search_term">Enter Company Name, Number, or SIC Code:</label>
+    <input type="text" id="search_term" name="search_term">
+
+    <label for="search_type">Search By:</label>
+    <select id="search_type">
+        <option value="name">Company Name</option>
+        <option value="number">Company Number</option>
+        <option value="sic">SIC Code</option>
+    </select>
+
+    <button onclick="searchCompanies()">Search</button>
+
+    <h2>Results</h2>
+    <table id="results">
+        <thead>
+            <tr>
+                <th>Company Name</th>
+                <th>Company Number</th>
+                <th>Status</th>
+                <th>Type</th>
+                <th>Address</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <button onclick="exportToCSV()">Export to CSV</button>
+    <button onclick="exportToExcel()">Export to Excel</button>
+
+    <script>
+        async function searchCompanies() {
+            const searchTerm = document.getElementById("search_term").value;
+            const searchType = document.getElementById("search_type").value;
+
+            const response = await fetch(`/search?search_term=${searchTerm}&search_type=${searchType}`);
+            const companies = await response.json();
+
+            const tbody = document.querySelector("#results tbody");
+            tbody.innerHTML = "";  // Clear previous results
+
+            companies.forEach(company => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `<td>${company['Company Name']}</td><td>${company['Company Number']}</td><td>${company['Status']}</td><td>${company['Type']}</td><td>${company['Address']}</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function exportToCSV() {
+            const response = await fetch(`/export?file_type=csv`, {
+                method: 'POST',
+                body: JSON.stringify(companies),
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const blob = await response.blob();
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "companies.csv";
+            link.click();
+        }
+
+        async function exportToExcel() {
+            const response = await fetch(`/export?file_type=excel`, {
+                method: 'POST',
+                body: JSON.stringify(companies),
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const blob = await response.blob();
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "companies.xlsx";
+            link.click();
+        }
+    </script>
+
+</body>
+</html>
