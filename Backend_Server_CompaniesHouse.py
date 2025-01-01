@@ -156,6 +156,8 @@ def fetch_company_details(company_number):
     return {}
 
 
+#---- Old Code without implementation search by SIC--------
+
 @app.route('/api/search', methods=['GET'])
 def search_companies():
     """Search companies by name, number, or SIC code."""
@@ -182,11 +184,20 @@ def search_companies():
                 detailed_companies.append(company_details)
 
         if detailed_companies:
-            return jsonify(detailed_companies)
+            # return jsonify(detailed_companies)
+            return jsonify({
+                "message": "Companies fetched successfully...",
+                "data": detailed_companies
+            })
         else:
             return jsonify({"error": "No detailed company information found"}), 404
     else:
         return jsonify({"error": "No companies found"}), 404
+
+
+
+
+
 
 
 
@@ -229,7 +240,7 @@ def export_companies_to_excel():
                     if company.get("company_number")
                 ])
                 if len(data['items']) < LIMIT:
-                    break  #No more pages
+                    break
                 page += 1
             else:
                 break
@@ -300,8 +311,7 @@ def search_and_export():
 
     return export_companies_to_excel()
 
-# from flask import Flask, request, jsonify, send_file, render_template, redirect
-# import pandas as pd
+
 
 
 """___UPLOAD EXCEL/CSV File"""
@@ -315,7 +325,6 @@ def upload_and_display_companies():
     file = request.files['file']
 
     try:
-        # Read the Excel file and extract company numbers
         df = pd.read_excel(file)
         if 'company_number' not in df.columns:
             return jsonify({"error": "The uploaded file must contain a 'company_number' column."}), 400
@@ -341,7 +350,12 @@ def upload_and_display_companies():
         if not detailed_companies:
             return jsonify({"error": "No companies found for the provided numbers or page."}), 404
 
-        return jsonify(detailed_companies)
+
+
+        return jsonify({
+            "message": "File uploaded and companies fetched successfully.",
+            "data": detailed_companies
+        })
 
     except Exception as e:
         return jsonify({"error": f"Error processing the file: {str(e)}"}), 500
