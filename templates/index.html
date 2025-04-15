@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Company Search</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        form {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Search Companies</h1>
+
+    <!-- Search Form -->
+    <form action="/search" method="POST">
+        <label for="search_term">Search Term (Company Name, Number, or SIC):</label>
+        <input type="text" id="search_term" name="search_term" required>
+        <button type="submit">Search</button>
+    </form>
+
+    {% if error %}
+    <p style="color: red;">{{ error }}</p>
+    {% endif %}
+
+    {% if results %}
+    <h2>Search Results</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Company Name</th>
+                <th>Company Number</th>
+                <th>Registered Office Address</th>
+                <th>Company Status</th>
+                <th>Company Type</th>
+                <th>Incorporated On</th>
+                <th>Accounts Overdue</th>
+                <th>Confirmation Statement Overdue</th>
+                <th>Nature of Business (SIC)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for company in results %}
+            <tr>
+                <td>{{ company['Company Name'] }}</td>
+                <td>{{ company['Company Number'] }}</td>
+                <td>{{ company['Registered Office Address'] }}</td>
+                <td>{{ company['Company Status'] }}</td>
+                <td>{{ company['Company Type'] }}</td>
+                <td>{{ company['Incorporated On'] }}</td>
+                <td>{{ company['Accounts Overdue'] }}</td>
+                <td>{{ company['Confirmation Statement Overdue'] }}</td>
+                <td>{{ company['Nature of Business (SIC)'] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Export Buttons -->
+    <form action="/export?file_type=csv" method="POST">
+        <button type="submit">Export to CSV</button>
+    </form>
+    <form action="/export?file_type=excel" method="POST">
+        <button type="submit">Export to Excel</button>
+    </form>
+    {% endif %}
+</body>
+</html>

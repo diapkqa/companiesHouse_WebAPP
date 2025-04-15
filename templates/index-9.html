@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Company Search Results</title>
+</head>
+<body>
+    <h1>Company Search Results</h1>
+    <form method="get" action="/search">
+        <input type="text" name="search_term" placeholder="Enter company name" required>
+        <button type="submit">Search</button>
+    </form>
+
+    {% if results %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Company Name</th>
+                    <th>Company Number</th>
+                    <th>Status</th>
+                    <th>Incorporated Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for company in results %}
+                    <tr>
+                        <td>{{ company.companyInfo.companyName }}</td>
+                        <td>{{ company.companyInfo.companyNumber }}</td>
+                        <td>{{ company.companyDetails.CompanyStatus }}</td>
+                        <td>{{ company.companyDetails.IncorporatedDate }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <a href="/export?file_type=csv&search_term={{ search_term }}">Download CSV</a>
+        <a href="/export?file_type=excel&search_term={{ search_term }}">Download Excel</a>
+    {% else %}
+        <p>No results found</p>
+    {% endif %}
+</body>
+</html>

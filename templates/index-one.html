@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Company Search</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        form {
+            margin-bottom: 20px;
+        }
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>Search Companies</h1>
+
+    <!-- Search Form -->
+    <form action="/search" method="POST">
+        <label for="search_term">Search Term (Company Name, Number, or SIC):</label>
+        <input type="text" id="search_term" name="search_term" required>
+        <button type="submit">Search</button>
+    </form>
+
+    {% if error %}
+    <p class="error">{{ error }}</p>
+    {% endif %}
+
+    {% if results %}
+    <h2>Search Results</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Company Name</th>
+                <th>Company Number</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for company in results %}
+            <tr>
+                <td>{{ company['Company Name'] }}</td>
+                <td>{{ company['Company Number'] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Export Buttons -->
+    <form action="/export?file_type=csv&search_term={{ search_term }}" method="POST">
+        <button type="submit">Export to CSV</button>
+    </form>
+    <form action="/export?file_type=excel&search_term={{ search_term }}" method="POST">
+        <button type="submit">Export to Excel</button>
+    </form>
+    {% endif %}
+</body>
+</html>

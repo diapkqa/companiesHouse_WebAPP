@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Company Search</title>
+    <style>
+        /* Reset default styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f7fc;
+            color: #333;
+            padding: 0 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: #4A90E2;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .search-container {
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .search-container label {
+            font-size: 1rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .search-container input,
+        .search-container select {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .search-container input:focus,
+        .search-container select:focus {
+            border-color: #4A90E2;
+            outline: none;
+        }
+
+        .search-container button {
+            width: 100%;
+            padding: 12px;
+            background-color: #4A90E2;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .search-container button:hover {
+            background-color: #357ABD;
+        }
+
+        table {
+            width: 100%;
+            margin-top: 30px;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 12px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+
+        th {
+            background-color: #4A90E2;
+            color: white;
+            font-size: 1.1rem;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        .export-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+
+        .export-buttons button {
+            padding: 12px;
+            width: 48%;
+            background-color: #50E3C2;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .export-buttons button:hover {
+            background-color: #35C39E;
+        }
+
+        .error {
+            color: red;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .search-container {
+                width: 100%;
+                padding: 20px;
+            }
+
+            .export-buttons {
+                flex-direction: column;
+            }
+
+            .export-buttons button {
+                width: 100%;
+                margin-bottom: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Company Search</h1>
+
+    <div class="search-container">
+        <form method="POST" action="/search">
+            <label for="search_term">Enter Company Name, Number, or SIC Code:</label>
+            <input type="text" id="search_term" name="search_term" required value="{{ request.form.get('search_term', '') }}">
+
+            <label for="search_type">Search By:</label>
+            <select id="search_type" name="search_type">
+                <option value="name" {% if request.form.get('search_type') == 'name' %} selected {% endif %}>Company Name</option>
+                <option value="number" {% if request.form.get('search_type') == 'number' %} selected {% endif %}>Company Number</option>
+                <option value="sic" {% if request.form.get('search_type') == 'sic' %} selected {% endif %}>SIC Code</option>
+            </select>
+
+            <button type="submit">Search</button>
+        </form>
+
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+
+        {% if results %}
+        <h2>Results</h2>
+        <table id="results">
+            <thead>
+                <tr>
+                    <th>Company Name</th>
+                    <th>Company Number</th>
+                    <th>Status</th>
+                    <th>Type</th>
+                    <th>Address</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for company in results %}
+                <tr>
+                    <td>{{ company['Company Name'] }}</td>
+                    <td>{{ company['Company Number'] }}</td>
+                    <td>{{ company['Status'] }}</td>
+                    <td>{{ company['Type'] }}</td>
+                    <td>{{ company['Address'] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="export-buttons">
+            <button onclick="exportToExcel()">Export to Excel</button>
+            <button onclick="exportToCSV()">Export to CSV</button>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        async function exportToExcel() {
+            const companies = Array.from(document.querySelectorAll("#results tbody tr")).map(tr => {
+                const cells = tr.querySelectorAll("td");
+                return {
+                    "Company Name": cells[0].textContent,
+                    "Company Number": cells[1].textContent,
+                    "Status": cells[2].textContent,
+                    "Type": cells[3].textContent,
+                    "Address": cells[4].textContent,
+                };
+            });
+
+            const response = await fetch(`/export?file_type=excel`, {
+                method: 'POST',
+                body: JSON.stringify(companies),
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = "companies.xlsx";
+                link.click();
+            } else {
+                alert("Failed to export data.");
+            }
+        }
+
+        async function exportToCSV() {
+            const companies = Array.from(document.querySelectorAll("#results tbody tr")).map(tr => {
+                const cells = tr.querySelectorAll("td");
+                return {
+                    "Company Name": cells[0].textContent,
+                    "Company Number": cells[1].textContent,
+                    "Status": cells[2].textContent,
+                    "Type": cells[3].textContent,
+                    "Address": cells[4].textContent,
+                };
+            });
+
+            const response = await fetch(`/export?file_type=csv`, {
+                method: 'POST',
+                body: JSON.stringify(companies),
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = "companies.csv";
+                link.click();
+            } else {
+                alert("Failed to export data.");
+            }
+        }
+    </script>
+
+</body>
+</html>

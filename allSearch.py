@@ -1,5 +1,4 @@
 import os
-import string
 import hashlib
 import json
 import requests
@@ -19,17 +18,15 @@ LIMIT = 10  # Number of results per page
 # Ensure cache directory exists
 os.makedirs(CACHE_DIR, exist_ok=True)
 
-
 def get_cache_file(query, page):
     """Generate a cache file path based on query and page."""
     cache_key = hashlib.md5(f"{query}-{page}".encode('utf-8')).hexdigest()
     return os.path.join(CACHE_DIR, f"{cache_key}.json")
 
-
 def fetch_companies(query, page=1):
     """Fetch companies from Companies House API."""
-    start_index = (page - 1) * LIMIT
-    url = f"{BASE_URL}/search/companies?q={query}&start_index={start_index}&items_per_page={LIMIT}"
+    start_index = (page - 1)
+    url = f"{BASE_URL}/search/companies?q={query}&start_index={start_index}"
     cache_file = get_cache_file(query, page)
 
     # Check cache
@@ -47,7 +44,6 @@ def fetch_companies(query, page=1):
     else:
         return None
 
-
 def fetch_company_details(company_number):
     """Fetch detailed company data from Companies House API."""
     url = f"{BASE_URL}/company/{company_number}"
@@ -57,9 +53,7 @@ def fetch_company_details(company_number):
         company_data = response.json()
 
         company_info = {
-            # "companyName": company_data.get("company_name", "N/A"),
-            "Company Name": company_data.get("companyInfo", {}).get("companyName", "N/A"),
-
+            "companyName": company_data.get("company_name", "N/A"),
             "companyNumber": company_data.get("company_number", "N/A"),
         }
 
@@ -70,10 +64,12 @@ def fetch_company_details(company_number):
             "IncorporatedDate": company_data.get("date_of_creation", "N/A"),
         }
 
+        # Fetch accounts information
         accounts = {
             "AccountsNextStatementDate": "N/A",
             "AccountsDueDate": "N/A",
-            "AccountsLastStatementDate": "N/A"
+            "AccountsLastStatementDate": "N/A",
+            "AccountsOverdue": "N/A"
         }
         if "accounts" in company_data:
             accounts_data = company_data["accounts"]
@@ -81,10 +77,19 @@ def fetch_company_details(company_number):
             accounts["AccountsDueDate"] = accounts_data.get("next_due", "N/A")
             accounts["AccountsLastStatementDate"] = accounts_data.get("last_accounts", "N/A")
 
+            # Check if 'next_due' and 'due_on' exist and compare for overdue status
+            if "next_due" in accounts_data and "due_on" in accounts_data:
+                if accounts_data["next_due"] < accounts_data["due_on"]:
+                    accounts["AccountsOverdue"] = "Yes"
+                else:
+                    accounts["AccountsOverdue"] = "No"
+
+        # Fetch confirmation statement information
         confirmation_statement = {
             "ConfirmationNextStatementDate": "N/A",
             "ConfirmationDueDate": "N/A",
-            "ConfirmationLastStatementDate": "N/A"
+            "ConfirmationLastStatementDate": "N/A",
+            "ConfirmationOverdue": "N/A",
         }
         if "confirmation_statement" in company_data:
             confirmation_statement_data = company_data["confirmation_statement"]
@@ -92,11 +97,22 @@ def fetch_company_details(company_number):
             confirmation_statement["ConfirmationDueDate"] = confirmation_statement_data.get("next_due", "N/A")
             confirmation_statement["ConfirmationLastStatementDate"] = confirmation_statement_data.get("last_made_up_to", "N/A")
 
+            # Check if 'next_due' and 'due_on' exist and compare for overdue status
+            if "next_due" in confirmation_statement_data and "due_on" in confirmation_statement_data:
+                if confirmation_statement_data["next_due"] < confirmation_statement_data["due_on"]:
+                    confirmation_statement["ConfirmationOverdue"] = "Yes"
+                else:
+                    confirmation_statement["ConfirmationOverdue"] = "No"
+
+        # Fetch SIC codes (Nature of business)
         nature_of_business = {"siCode": "N/A", "Description": "N/A"}
         if "sic_codes" in company_data and company_data["sic_codes"]:
             sic_code = company_data["sic_codes"][0]
             nature_of_business["siCode"] = sic_code
+            # Description might not be available directly via the API, so we leave it as "N/A"
+            nature_of_business["Description"] = "N/A"
 
+        # Fetch previous company names
         previous_names = []
         if "previous_names" in company_data:
             for name in company_data["previous_names"]:
@@ -117,98 +133,65 @@ def fetch_company_details(company_number):
 
     return {}
 
-
-@app.route('/api/search', methods=['GET'])
-def search_companies():
-    """Search companies by name, number, or SIC code."""
-    query = request.args.get('query', '').strip()
-    search_type = request.args.get('type', 'name').strip().lower()
-    page = int(request.args.get('page', 1))
-
-    if not query:
-        return jsonify({"error": "Search term is required"}), 400
-
-    data = fetch_companies(query, page)
-    if data and 'items' in data:
-        # Fetch detailed information for each company
-        detailed_companies = []
-        for company in data['items']:
-            company_number = company.get("company_number")
-            if company_number:
-                company_details = fetch_company_details(company_number)
-                detailed_companies.append(company_details)
-
-        if detailed_companies:
-            return jsonify(detailed_companies)
-        else:
-            return jsonify({"error": "No detailed company information found"}), 404
-    else:
-        return jsonify({"error": "No companies found"}), 404
-
-
 @app.route('/api/export', methods=['GET'])
 def export_companies():
-    """Export all search results to an Excel or CSV file."""
+    """Export all companies' data to Excel/CSV based on query."""
     query = request.args.get('query', '').strip()
-    search_type = request.args.get('type', 'name').strip().lower()
-
     if not query:
         return jsonify({"error": "Search term is required"}), 400
 
-    page = 1
     all_companies = []
-
-    # Fetch and accumulate data across all pages
+    page = 1
     while True:
         data = fetch_companies(query, page)
         if data and 'items' in data:
-            detailed_companies = []
             for company in data['items']:
                 company_number = company.get("company_number")
                 if company_number:
                     company_details = fetch_company_details(company_number)
-                    detailed_companies.append(company_details)
-            all_companies.extend(detailed_companies)
-            if len(data['items']) < LIMIT:  # End of data (no more pages)
+                    all_companies.append(company_details)
+
+            # Check if there is more data to fetch (pagination)
+            if len(data['items']) < LIMIT:
                 break
             page += 1
         else:
             break
 
-    if not all_companies:
-        return jsonify({"error": "No companies found"}), 404
+    # Create a DataFrame
+    if all_companies:
+        company_data = []
+        for company in all_companies:
+            company_data.append({
+                "Company Name": company.get("companyInfo", {}).get("companyName", "N/A"),
+                "Company Number": company.get("companyInfo", {}).get("companyNumber", "N/A"),
+                "Registered Office Address": company.get("companyDetails", {}).get("RegisteredOfficeAddress", "N/A"),
+                "Company Type": company.get("companyDetails", {}).get("CompanyType", "N/A"),
+                "Company Status": company.get("companyDetails", {}).get("CompanyStatus", "N/A"),
+                "Incorporated Date": company.get("companyDetails", {}).get("IncorporatedDate", "N/A"),
+                "Accounts Next Statement Date": company.get("accounts", {}).get("AccountsNextStatementDate", "N/A"),
+                "Accounts Due Date": company.get("accounts", {}).get("AccountsDueDate", "N/A"),
+                "Accounts Last Statement Date": company.get("accounts", {}).get("AccountsLastStatementDate", "N/A"),
+                "Accounts Overdue": company.get("accounts", {}).get("AccountsOverdue", "N/A"),
+                "Confirmation Next Statement Date": company.get("confirmationStatement", {}).get("ConfirmationNextStatementDate", "N/A"),
+                "Confirmation Due Date": company.get("confirmationStatement", {}).get("ConfirmationDueDate", "N/A"),
+                "Confirmation Last Statement Date": company.get("confirmationStatement", {}).get("ConfirmationLastStatementDate", "N/A"),
+                "Confirmation Overdue": company.get("confirmationStatement", {}).get("ConfirmationOverdue", "N/A"),
+                "SIC Code": company.get("natureOfBusiness", {}).get("siCode", "N/A"),
+                "Business Description": company.get("natureOfBusiness", {}).get("Description", "N/A"),
+            })
 
-    # Convert to pandas DataFrame
-    company_data = []
-    for company in all_companies:
-        company_data.append({
-            "Company Name": company["companyInfo"].get("companyName", "N/A"),
-            "Company Number": company["companyInfo"].get("companyNumber", "N/A"),
-            "Company Type": company["companyDetails"].get("CompanyType", "N/A"),
-            "Company Status": company["companyDetails"].get("CompanyStatus", "N/A"),
-            "Incorporated Date": company["companyDetails"].get("IncorporatedDate", "N/A"),
-            "Registered Office Address": company["companyDetails"].get("RegisteredOfficeAddress", "N/A"),
-            "Accounts Next Statement Date": company["accounts"].get("AccountsNextStatementDate", "N/A"),
-            "Accounts Due Date": company["accounts"].get("AccountsDueDate", "N/A"),
-            "Accounts Last Statement Date": company["accounts"].get("AccountsLastStatementDate", "N/A"),
-            "Confirmation Next Statement Date": company["confirmationStatement"].get("ConfirmationNextStatementDate", "N/A"),
-            "Confirmation Due Date": company["confirmationStatement"].get("ConfirmationDueDate", "N/A"),
-            "Confirmation Last Statement Date": company["confirmationStatement"].get("ConfirmationLastStatementDate", "N/A"),
-            "SIC Code": company["natureOfBusiness"].get("siCode", "N/A"),
-        })
+        df = pd.DataFrame(company_data)
 
-    df = pd.DataFrame(company_data)
+        # Save the DataFrame to Excel or CSV
+        file_path = './exported_companies.xlsx'
+        df.to_excel(file_path, index=False)  # Change to .csv for CSV format
+        return send_file(file_path, as_attachment=True, download_name="companies.xlsx",
+                         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-    # Save the data to Excel or CSV
-    output_file = 'companies_data.xlsx'
-    df.to_excel(output_file, index=False)
+        # return send_file(file_path, as_attachment=True)
 
-    # Optionally, for CSV export:
-    # output_file = 'companies_data.csv'
-    # df.to_csv(output_file, index=False)
-
-    return send_file(output_file, as_attachment=True)
-
+    return jsonify({"error": "No data found to export"}), 404
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5000, debug=True)
+    app.run(host='192.168.1.87', port=5000, debug=True)
